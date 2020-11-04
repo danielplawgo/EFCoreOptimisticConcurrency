@@ -15,15 +15,15 @@ namespace EFCoreOptimisticConcurrency
 
             var tasks = new[]
             {
-                ChangePrice(productId, 11, 1000),
-                ChangePrice(productId, 12, 100)
+                EditProduct(productId, p => p.Price = 11, 1000),
+                EditProduct(productId, p => p.Price = 12, 100)
             };
 
             await Task.WhenAll(tasks);
 
-            var price = await GetPrice(productId);
+            var product = await GetProduct(productId);
 
-            Console.WriteLine($"Product price: {price}");
+            Console.WriteLine($"Product: {product.Name}, price: {product.Price}");
         }
 
         private static async Task Setup(Guid productId)
@@ -36,19 +36,19 @@ namespace EFCoreOptimisticConcurrency
             {
                 product = new Product()
                 {
-                    Id = productId,
-                    Name = "Test"
+                    Id = productId
                 };
 
                 await db.Products.AddAsync(product);
             }
 
+            product.Name = "product";
             product.Price = 10;
 
             await db.SaveChangesAsync();
         }
 
-        private static async Task ChangePrice(Guid productId, decimal price, int delay)
+        private static async Task EditProduct(Guid productId, Action<Product> editAction, int delay)
         {
             await using var db = new DataContext();
 
@@ -56,18 +56,17 @@ namespace EFCoreOptimisticConcurrency
 
             await Task.Delay(delay);
 
-            product.Price = price;
+            editAction(product);
 
             await db.SaveChangesAsync();
         }
 
-        private static async Task<decimal> GetPrice(Guid productId)
+        private static async Task<Product> GetProduct(Guid productId)
         {
             await using var db = new DataContext();
 
             return await db.Products
                 .Where(p => p.Id == productId)
-                .Select(p => p.Price)
                 .FirstOrDefaultAsync();
         }
     }
