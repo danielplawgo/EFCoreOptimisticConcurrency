@@ -16,7 +16,7 @@ namespace EFCoreOptimisticConcurrency
             var tasks = new[]
             {
                 EditProduct(productId, p => p.Price = 11, 1000),
-                EditProduct(productId, p => p.Price = 12, 100)
+                EditProduct(productId, p => p.Name = "new product", 100)
             };
 
             await Task.WhenAll(tasks);
