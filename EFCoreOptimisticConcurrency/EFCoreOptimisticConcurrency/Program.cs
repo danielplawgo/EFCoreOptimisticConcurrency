@@ -23,6 +23,7 @@ namespace EFCoreOptimisticConcurrency
 
             var product = await GetProduct(productId);
 
+            Console.WriteLine();
             Console.WriteLine($"Product: {product.Name}, price: {product.Price}");
         }
 
@@ -52,13 +53,41 @@ namespace EFCoreOptimisticConcurrency
         {
             await using var db = new DataContext();
 
-            var product = await db.Products.FirstOrDefaultAsync(p => p.Id == productId);
+            try
+            {
+                var product = await db.Products.FirstOrDefaultAsync(p => p.Id == productId);
 
-            await Task.Delay(delay);
+                await Task.Delay(delay);
 
-            editAction(product);
+                editAction(product);
 
-            await db.SaveChangesAsync();
+                await db.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                foreach (var entry in ex.Entries)
+                {
+                    var databaseValues = await entry.GetDatabaseValuesAsync();
+
+                    foreach (var property in entry.CurrentValues.Properties)
+                    {
+                        var proposedValue = entry.CurrentValues[property];
+                        var databaseValue = databaseValues[property];
+                        var originalValue = entry.OriginalValues[property];
+
+                        if (proposedValue.Equals(databaseValue) || originalValue.Equals(databaseValue) || property.Name == "RowVersion")
+                        {
+                            continue;
+                        }
+
+                        Console.WriteLine($"ProposedValue: {proposedValue}, DatabaseValue: {databaseValue}, OriginalValue: {originalValue}.");
+
+                        //proposedValues[property] = wartość do zapisu;
+                    }
+
+                    entry.OriginalValues.SetValues(databaseValues);
+                }
+            }
         }
 
         private static async Task<Product> GetProduct(Guid productId)
